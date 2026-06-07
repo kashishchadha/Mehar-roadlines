@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { formatDateDDMMYYYY } from '../utils/dateUtils'
+import apiClient from '../utils/apiClient'
 
 function TrackShipment() {
   const [trackingId, setTrackingId] = useState('')
@@ -12,22 +14,18 @@ function TrackShipment() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`http://localhost:5000/api/shipments/${id}`)
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.message || 'Shipment not found')
-      }
-      const data = await res.json()
-      setShipment(data)
+      const res = await apiClient.get(`/shipments/${id}`)
+      setShipment(res.data)
       setSearched(true)
     } catch (err) {
-      setError(err.message)
+      setError(err.response?.data?.message || err.message)
       setShipment(null)
       setSearched(false)
     } finally {
       setLoading(false)
     }
   }
+
 
 
   const handleTrack = (e) => {
@@ -61,10 +59,14 @@ function TrackShipment() {
     { label: 'Tracking ID', value: shipment.trackingId, bold: true },
     { label: 'Current Status', value: shipment.status, highlight: true },
     { label: 'Route', route: { from: shipment.origin, to: shipment.destination } },
-    { label: 'Current Location', value: shipment.currentLocation },
-    { label: 'Estimated Arrival', value: shipment.estimatedArrival, bold: true },
+    { label: 'Current Location', value: shipment.currentLocation || 'Origin Depot' },
+    { label: 'Vehicle Details', value: shipment.vehicle || 'Unassigned' },
+    { label: 'Estimated Arrival', value: formatDateDDMMYYYY(shipment.estimatedArrival), bold: true },
+    { label: 'Cargo Description', value: shipment.cargoDescription || 'Not Specified' },
+    { label: 'Weight / Packages', value: `${shipment.weight || 'TBD'} MT / ${shipment.packagesCount || 'TBD'} Pkgs` },
     { label: 'Shipment Type', value: shipment.shipmentType },
   ] : []
+
 
   return (
     <main className="relative z-10 pb-16">
@@ -291,7 +293,7 @@ function TrackShipment() {
                               {step.label}
                             </span>
                             <span className={`text-[11px] font-semibold mt-1 ${isActive ? 'text-secondary-dark' : 'text-on-surface-muted/60'}`}>
-                              {step.date}
+                              {formatDateDDMMYYYY(step.date)}
                             </span>
                           </div>
                         );
@@ -332,7 +334,7 @@ function TrackShipment() {
                                 {step.label}
                               </span>
                               <span className="text-xs text-on-surface-muted mt-0.5">
-                                {step.date}
+                                {formatDateDDMMYYYY(step.date)}
                               </span>
                             </div>
                           </div>

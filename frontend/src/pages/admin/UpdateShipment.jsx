@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { parseEstimatedArrival, formatDateDDMMYYYY } from '../../utils/dateUtils'
+import apiClient from '../../utils/apiClient'
+
+import UpdateStatusForm from '../../components/admin/UpdateStatusForm'
+import UpdateRouteStops from '../../components/admin/UpdateRouteStops'
+import UpdateManifestDetails from '../../components/admin/UpdateManifestDetails'
 
 function UpdateShipment() {
   const { trackingId } = useParams()
@@ -9,21 +15,27 @@ function UpdateShipment() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
-  // Update form states
   const [status, setStatus] = useState('')
   const [currentLocation, setCurrentLocation] = useState('')
+  const [estimatedArrival, setEstimatedArrival] = useState('')
+  const [deliveryDate, setDeliveryDate] = useState('')
+  const [deliveryTimeOfDay, setDeliveryTimeOfDay] = useState('Any Time')
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const handleCopy = () => {
-    if (shipment?.trackingId) {
-      navigator.clipboard.writeText(shipment.trackingId)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [driverName, setDriverName] = useState('')
+  const [driverPhone, setDriverPhone] = useState('')
+  const [driverWhatsapp, setDriverWhatsapp] = useState('')
+  const [vehicle, setVehicle] = useState('')
+  const [weight, setWeight] = useState('')
+  const [packagesCount, setPackagesCount] = useState('')
+  const [shipmentType, setShipmentType] = useState('')
+  const [cargoDescription, setCargoDescription] = useState('')
+  const [specialInstructions, setSpecialInstructions] = useState('')
+  const [isEditingDetails, setIsEditingDetails] = useState(false)
 
-  // Route edit states
   const [origin, setOrigin] = useState('')
   const [destination, setDestination] = useState('')
   const [routePoints, setRoutePoints] = useState([])
@@ -73,7 +85,6 @@ function UpdateShipment() {
     ];
     setRoutePoints(updatedPoints);
     
-    // Set default preset for next select
     const nextPresets = LOCATION_PRESETS[newPoint.type] || [];
     setNewPoint({ ...newPoint, name: nextPresets[0] || 'Custom', customName: '' });
   };
@@ -125,21 +136,42 @@ function UpdateShipment() {
     setDraggedIndex(null)
   }
 
+  const handleCopy = () => {
+    if (shipment?.trackingId) {
+      navigator.clipboard.writeText(shipment.trackingId)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
   const fetchShipment = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/shipments/${trackingId}`)
-      if (!res.ok) {
-        throw new Error('Shipment not found')
-      }
-      const data = await res.json()
+      const res = await apiClient.get(`/shipments/${trackingId}`)
+      const data = res.data
       setShipment(data)
       setStatus(data.status)
       setCurrentLocation(data.currentLocation || '')
+      setEstimatedArrival(data.estimatedArrival || '')
+      const parsedEta = parseEstimatedArrival(data.estimatedArrival || data.expectedDeliveryDate || '')
+      setDeliveryDate(parsedEta.date)
+      setDeliveryTimeOfDay(parsedEta.timeOfDay)
       setOrigin(data.origin || '')
       setDestination(data.destination || '')
       setRoutePoints(data.routePoints || [])
+
+      setCustomerName(data.customerName || '')
+      setCustomerPhone(data.phone || '')
+      setDriverName(data.driver?.name || '')
+      setDriverPhone(data.driver?.phone || '')
+      setDriverWhatsapp(data.driver?.whatsapp || '')
+      setVehicle(data.vehicle || '')
+      setWeight(data.weight || '')
+      setPackagesCount(data.packagesCount || '')
+      setShipmentType(data.shipmentType || 'Full Truck Load (FTL)')
+      setCargoDescription(data.cargoDescription || '')
+      setSpecialInstructions(data.specialInstructions || '')
     } catch (err) {
-      setError(err.message)
+      setError(err.response?.data?.message || err.message)
     } finally {
       setLoading(false)
     }
@@ -149,11 +181,43 @@ function UpdateShipment() {
     fetchShipment()
   }, [trackingId])
 
+  const checkDateDiff = (d) => {
+    const today = new Date();
+    const todayZero = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const dZero = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffTime = dZero.getTime() - todayZero.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    return diffDays >= 0 && diffDays <= 1;
+  };
+
+  const isDeliveryNear = (etaString) => {
+    if (!etaString) return false;
+    const lower = etaString.toLowerCase().trim();
+    if (lower === 'completed' || lower === 'tbd' || lower === 'delivered' || lower === 'pending') return false;
+    if (lower.includes('today') || lower.includes('tomorrow')) return true;
+    
+    try {
+      const cleanStr = etaString.replace(/\([^)]*\)/g, '').trim();
+      const ddmm = cleanStr.match(/^(\d{2})\s+(\d{2})\s+(\d{4})$/);
+      if (ddmm) {
+        const d = new Date(Number(ddmm[3]), Number(ddmm[2]) - 1, Number(ddmm[1]));
+        return checkDateDiff(d);
+      }
+      
+      const parsed = Date.parse(cleanStr);
+      if (!isNaN(parsed)) {
+        return checkDateDiff(new Date(parsed));
+      }
+    } catch (e) {
+      // ignore
+    }
+    return false;
+  };
+
   const handleUpdate = async (e) => {
     if (e) e.preventDefault()
     setSaving(true)
     
-    // Check if the current location is a new intermediate stop
     let finalRoutePoints = [...routePoints]
     const currentLocTrim = currentLocation.trim()
     
@@ -166,7 +230,6 @@ function UpdateShipment() {
       if (!exists && 
           !currentLocTrim.toLowerCase().startsWith('origin depot') && 
           !currentLocTrim.toLowerCase().startsWith('destination depot')) {
-        // Automatically add it as an intermediate stop!
         finalRoutePoints.push({
           type: 'City',
           name: currentLocTrim,
@@ -177,36 +240,57 @@ function UpdateShipment() {
     }
 
     try {
-      const res = await fetch(`http://localhost:5000/api/shipments/${trackingId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          status, 
-          currentLocation,
-          origin,
-          destination,
-          routePoints: finalRoutePoints
-        })
+      const res = await apiClient.put(`/shipments/${trackingId}`, { 
+        status, 
+        currentLocation,
+        expectedDeliveryDate: deliveryDate,
+        deliveryTimeOfDay,
+        estimatedArrival: status === 'Delivered' ? 'Completed' : (deliveryDate ? `${deliveryDate}${deliveryTimeOfDay && deliveryTimeOfDay !== 'Any Time' ? ` (${deliveryTimeOfDay})` : ''}` : estimatedArrival),
+        origin,
+        destination,
+        routePoints: finalRoutePoints,
+        customerName,
+        phone: customerPhone,
+        driverName,
+        driverPhone,
+        driverWhatsapp,
+        vehicle,
+        weight,
+        packagesCount,
+        shipmentType,
+        cargoDescription,
+        specialInstructions
       })
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}))
-        throw new Error(errData.message || 'Failed to update shipment')
-      }
       
-      const updatedData = await res.json()
+      const updatedData = res.data
       setShipment(updatedData)
       setStatus(updatedData.status)
       setCurrentLocation(updatedData.currentLocation || '')
+      setEstimatedArrival(updatedData.estimatedArrival || '')
+      const parsedEta = parseEstimatedArrival(updatedData.estimatedArrival || updatedData.expectedDeliveryDate || '')
+      setDeliveryDate(parsedEta.date)
+      setDeliveryTimeOfDay(parsedEta.timeOfDay)
       setOrigin(updatedData.origin || '')
       setDestination(updatedData.destination || '')
       setRoutePoints(updatedData.routePoints || [])
+
+      setCustomerName(updatedData.customerName || '')
+      setCustomerPhone(updatedData.phone || '')
+      setDriverName(updatedData.driver?.name || '')
+      setDriverPhone(updatedData.driver?.phone || '')
+      setDriverWhatsapp(updatedData.driver?.whatsapp || '')
+      setVehicle(updatedData.vehicle || '')
+      setWeight(updatedData.weight || '')
+      setPackagesCount(updatedData.packagesCount || '')
+      setShipmentType(updatedData.shipmentType || 'Full Truck Load (FTL)')
+      setCargoDescription(updatedData.cargoDescription || '')
+      setSpecialInstructions(updatedData.specialInstructions || '')
+
       setIsEditingRoute(false)
+      setIsEditingDetails(false)
       showModal('Shipment Updated', 'Shipment record and routes updated successfully!', 'success')
     } catch (err) {
-      showModal('Update Failed', err.message, 'error')
+      showModal('Update Failed', err.response?.data?.message || err.message, 'error')
     } finally {
       setSaving(false)
     }
@@ -217,22 +301,6 @@ function UpdateShipment() {
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <span className="material-symbols-outlined animate-spin text-5xl text-secondary mb-4">refresh</span>
         <p className="text-on-surface-muted font-bold">Loading shipment details...</p>
-      </div>
-    )
-  }
-
-  if (error || !shipment) {
-    return (
-      <div className="p-8 max-w-xl mx-auto text-center space-y-6">
-        <span className="material-symbols-outlined text-6xl text-red-500">warning</span>
-        <h3 className="text-2xl font-bold text-primary">Error Loading Shipment</h3>
-        <p className="text-on-surface-muted">{error || 'Shipment record could not be found.'}</p>
-        <button
-          onClick={() => navigate('/admin/dashboard')}
-          className="px-6 py-3 bg-secondary text-white font-bold rounded"
-        >
-          Return to Dashboard
-        </button>
       </div>
     )
   }
@@ -254,12 +322,11 @@ function UpdateShipment() {
 
   return (
     <div className="p-8 max-w-[1440px] mx-auto w-full space-y-8">
-      {/* Top Navbar Header */}
       <header className="flex justify-between items-center pb-6 border-b border-outline-light">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/admin/dashboard')}
-            className="p-2 hover:bg-surface-low rounded-full transition-all text-secondary"
+            className="p-2 hover:bg-surface-low rounded-full transition-all text-secondary cursor-pointer"
             aria-label="Back to dashboard"
           >
             <span className="material-symbols-outlined">arrow_back</span>
@@ -279,184 +346,34 @@ function UpdateShipment() {
         </div>
         <div className="flex gap-3">
           <span className="px-4 py-1.5 bg-secondary text-on-secondary rounded font-bold text-sm">
-            ETA: {shipment.estimatedArrival}
+            ETA: {formatDateDDMMYYYY(shipment.estimatedArrival)}
           </span>
         </div>
       </header>
 
-      {/* Main Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-8">
-        
-        {/* LEFT COLUMN: Controls & Timeline (65%) */}
         <div className="lg:col-span-6 space-y-8">
-          
-          {/* Section 1: Update Status Form */}
-          <section className="bg-white border border-outline-light rounded-lg p-6 shadow-sm">
-            <h2 className="text-sm font-bold text-secondary mb-6 flex items-center gap-2 uppercase tracking-wider">
-              <span className="material-symbols-outlined">sync_alt</span>
-              Update Shipment Status
-            </h2>
+          <UpdateStatusForm
+            status={status}
+            setStatus={setStatus}
+            currentLocation={currentLocation}
+            setCurrentLocation={setCurrentLocation}
+            deliveryDate={deliveryDate}
+            setDeliveryDate={setDeliveryDate}
+            deliveryTimeOfDay={deliveryTimeOfDay}
+            setDeliveryTimeOfDay={setDeliveryTimeOfDay}
+            estimatedArrival={estimatedArrival}
+            isDeliveryNear={isDeliveryNear}
+            origin={origin}
+            destination={destination}
+            routePoints={routePoints}
+            saving={saving}
+            handleUpdate={handleUpdate}
+          />
 
-            <form onSubmit={handleUpdate} className="space-y-6">
-              <div className="space-y-3">
-                <label className="text-sm font-bold text-on-surface-muted block">Quick Status Update</label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {[
-                    { val: 'Picked Up', icon: 'inventory' },
-                    { val: 'In Transit', icon: 'local_shipping' },
-                    { val: 'Delivered', icon: 'task_alt' }
-                  ].map(btn => (
-                    <button
-                      key={btn.val}
-                      type="button"
-                      onClick={() => {
-                        setStatus(btn.val)
-                        if (btn.val === 'Delivered' && destination) {
-                          setCurrentLocation(destination)
-                        } else if (btn.val === 'Picked Up' && origin) {
-                          setCurrentLocation(origin)
-                        }
-                      }}
-                      className={`flex flex-col items-center justify-center p-4 rounded border-2 transition-all gap-2 ${
-                        status.toLowerCase() === btn.val.toLowerCase()
-                          ? 'border-secondary bg-secondary/5 text-secondary'
-                          : 'border-outline-light hover:border-secondary hover:bg-surface-low'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined">{btn.icon}</span>
-                      <span className="text-xs font-bold">{btn.val}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <label className="text-sm font-bold text-on-surface-muted block">Where is the truck now? (Current Location)</label>
-                <input
-                  type="text"
-                  value={currentLocation}
-                  onChange={(e) => setCurrentLocation(e.target.value)}
-                  placeholder="e.g. Near Vadodara Toll Plaza, NH-48"
-                  className="w-full h-12 bg-white border border-outline-light rounded px-4 focus:ring-1 focus:ring-secondary focus:border-secondary text-sm outline-none"
-                />
-                
-                {/* Quick Select from Route stops */}
-                {(() => {
-                  const stopSequence = [
-                    origin,
-                    ...routePoints.map(pt => pt.name),
-                    destination
-                  ].filter(Boolean)
-
-                  const selectedIndex = stopSequence.findIndex(name => {
-                    const curr = currentLocation.trim().toLowerCase();
-                    const stop = name.trim().toLowerCase();
-                    return curr === stop;
-                  })
-
-                  return (
-                    <div className="space-y-1.5 pt-1">
-                      <span className="text-xs font-bold text-on-surface-muted flex items-center gap-1">
-                        <span className="material-symbols-outlined text-[14px]">ads_click</span>
-                        Quick Select from Route stops:
-                      </span>
-                      <div className="flex flex-wrap gap-2">
-                        {/* Origin */}
-                        {origin && (() => {
-                          const isSelected = selectedIndex === 0;
-                          const isCovered = selectedIndex > 0;
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setCurrentLocation(origin)
-                                setStatus('Picked Up')
-                              }}
-                              className={`px-3 py-1.5 rounded border text-xs font-bold transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'bg-primary border-primary text-white shadow-sm'
-                                  : isCovered
-                                  ? 'bg-slate-100 border-slate-200 text-slate-400 font-medium opacity-75'
-                                  : 'bg-white border-outline-light text-primary hover:bg-surface-low'
-                              }`}
-                            >
-                              {isCovered ? '✓ ' : ''}Origin: {origin}
-                            </button>
-                          );
-                        })()}
-
-                        {/* Intermediate stops */}
-                        {routePoints.map((pt, index) => {
-                          const stopSeqIndex = index + 1;
-                          const isSelected = selectedIndex === stopSeqIndex;
-                          const isCovered = selectedIndex > stopSeqIndex;
-                          return (
-                            <button
-                              key={index}
-                              type="button"
-                              onClick={() => {
-                                setCurrentLocation(pt.name)
-                                setStatus('In Transit')
-                              }}
-                              className={`px-3 py-1.5 rounded border text-xs font-bold transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'bg-secondary border-secondary text-white shadow-sm'
-                                  : isCovered
-                                  ? 'bg-slate-100 border-slate-200 text-slate-400 font-medium opacity-75'
-                                  : 'bg-white border-outline-light text-secondary hover:bg-surface-low'
-                              }`}
-                            >
-                              {isCovered ? '✓ ' : ''}Stop: {pt.name}
-                            </button>
-                          );
-                        })}
-
-                        {/* Destination */}
-                        {destination && (() => {
-                          const destSeqIndex = stopSequence.length - 1;
-                          const isSelected = selectedIndex === destSeqIndex;
-                          const isCovered = selectedIndex > destSeqIndex;
-                          return (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setCurrentLocation(destination)
-                                setStatus('Delivered')
-                              }}
-                              className={`px-3 py-1.5 rounded border text-xs font-bold transition-all cursor-pointer ${
-                                isSelected
-                                  ? 'bg-green-700 border-green-700 text-white shadow-sm'
-                                  : isCovered
-                                  ? 'bg-slate-100 border-slate-200 text-slate-400 font-medium opacity-75'
-                                  : 'bg-white border-outline-light text-green-700 hover:bg-surface-low'
-                              }`}
-                            >
-                              {isCovered ? '✓ ' : ''}Dest: {destination}
-                            </button>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full h-12 bg-secondary text-white text-sm font-bold rounded hover:brightness-110 active:scale-[0.99] transition-all flex items-center justify-center gap-3 shadow-md disabled:opacity-75"
-              >
-                <span className="material-symbols-outlined">check_circle</span>
-                {saving ? 'Saving...' : 'Save Status Update'}
-              </button>
-            </form>
-          </section>
-
-          {/* Section 2: Progress Timeline */}
           <section className="bg-white border border-outline-light rounded-lg p-6 shadow-sm">
             <h2 className="text-sm font-bold text-secondary mb-8 uppercase tracking-wider">Progress Timeline</h2>
             <div className="relative px-4 pb-4">
-              {/* Stepper background line */}
               <div className="hidden md:block absolute top-[20px] left-[20px] right-[20px] h-1 bg-surface-mid rounded z-0">
                 <div className="h-full bg-secondary transition-all duration-500 rounded" style={{ width: `${progressPercent}%` }} />
               </div>
@@ -483,351 +400,66 @@ function UpdateShipment() {
             </div>
           </section>
 
-          {/* Section 3: Timeline Route logs */}
-          <section className="bg-white border border-outline-light rounded-lg overflow-hidden shadow-sm">
-            <div className="p-6 border-b border-outline-light bg-surface-low flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-secondary text-lg font-bold">alt_route</span>
-                <h2 className="text-xs font-bold text-secondary uppercase tracking-wider">Route Info &amp; Stops</h2>
-              </div>
-              <div className="flex items-center gap-4">
-                <span className="text-xs font-bold text-primary">Type: {shipment.shipmentType}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isEditingRoute) {
-                      // Cancel resets fields
-                      setOrigin(shipment.origin || '')
-                      setDestination(shipment.destination || '')
-                      setRoutePoints(shipment.routePoints || [])
-                    }
-                    setIsEditingRoute(!isEditingRoute)
-                  }}
-                  className="text-xs font-bold text-secondary hover:underline flex items-center gap-1 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[16px]">{isEditingRoute ? 'close' : 'edit'}</span>
-                  {isEditingRoute ? 'Cancel' : 'Edit Route'}
-                </button>
-              </div>
-            </div>
-
-            {isEditingRoute ? (
-              <div className="p-6 space-y-6 bg-surface-low">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold text-on-surface-muted">Origin City</label>
-                    <input
-                      type="text"
-                      value={origin}
-                      onChange={(e) => setOrigin(e.target.value)}
-                      className="h-10 px-3 bg-white border border-outline-light rounded text-xs outline-none focus:ring-1 focus:ring-secondary focus:border-secondary"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-bold text-on-surface-muted">Destination City</label>
-                    <input
-                      type="text"
-                      value={destination}
-                      onChange={(e) => setDestination(e.target.value)}
-                      className="h-10 px-3 bg-white border border-outline-light rounded text-xs outline-none focus:ring-1 focus:ring-secondary focus:border-secondary"
-                    />
-                  </div>
-                </div>
-
-                {/* Intermediate Stops Editor */}
-                <div className="border-t border-outline-light pt-4 space-y-4">
-                  <h4 className="text-xs font-bold text-primary">Intermediate Stops &amp; Transit Points</h4>
-                  
-                  {/* Form to add point */}
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end bg-white p-3 rounded border border-outline-light shadow-sm">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold text-on-surface-muted">Point Type</label>
-                      <select
-                        value={newPoint.type}
-                        onChange={(e) => {
-                          const newType = e.target.value;
-                          const presets = LOCATION_PRESETS[newType] || [];
-                          setNewPoint({
-                            ...newPoint,
-                            type: newType,
-                            name: presets[0] || 'Custom',
-                            customName: '',
-                            state: 'Maharashtra'
-                          });
-                        }}
-                        className="h-9 px-2 bg-white border border-outline-light rounded text-xs outline-none focus:ring-1 focus:ring-secondary"
-                      >
-                        <option value="City">City</option>
-                        <option value="Hub">Transit Hub</option>
-                        <option value="Warehouse">Warehouse</option>
-                        <option value="Toll Plaza">Toll Plaza</option>
-                      </select>
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-bold text-on-surface-muted">Location Name</label>
-                      <select
-                        value={newPoint.name}
-                        onChange={(e) => setNewPoint({ ...newPoint, name: e.target.value })}
-                        className="h-9 px-2 bg-white border border-outline-light rounded text-xs outline-none focus:ring-1 focus:ring-secondary"
-                      >
-                        {(LOCATION_PRESETS[newPoint.type] || []).map(preset => (
-                          <option key={preset} value={preset}>{preset}</option>
-                        ))}
-                        <option value="Custom">-- Custom Write-in --</option>
-                      </select>
-                    </div>
-
-                    {newPoint.name === 'Custom' ? (
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-bold text-on-surface-muted">Custom Name</label>
-                        <input
-                          type="text"
-                          value={newPoint.customName}
-                          onChange={(e) => setNewPoint({ ...newPoint, customName: e.target.value })}
-                          placeholder="Type location..."
-                          className="h-9 px-2 bg-white border border-outline-light rounded text-xs outline-none focus:ring-1 focus:ring-secondary"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-bold text-on-surface-muted">State</label>
-                        <select
-                          value={newPoint.state}
-                          onChange={(e) => setNewPoint({ ...newPoint, state: e.target.value })}
-                          className="h-9 px-2 bg-white border border-outline-light rounded text-xs outline-none focus:ring-1 focus:ring-secondary"
-                        >
-                          <option>Maharashtra</option>
-                          <option>Delhi</option>
-                          <option>Gujarat</option>
-                          <option>Punjab</option>
-                          <option>Karnataka</option>
-                          <option>Rajasthan</option>
-                          <option>Madhya Pradesh</option>
-                          <option>Haryana</option>
-                        </select>
-                      </div>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={handleAddPoint}
-                      className="h-9 bg-secondary text-white text-xs font-bold rounded hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-sm">add</span>
-                      Add Stop
-                    </button>
-                  </div>
-
-                  {/* Interactive stops list */}
-                  <div className="relative pl-6 space-y-3 border-l-2 border-dashed border-outline-light">
-                    {/* Origin */}
-                    <div className="relative flex items-center justify-between bg-white px-3 py-2 rounded border border-outline-light shadow-sm text-xs">
-                      <div className="absolute -left-[33px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-primary rounded-full border-4 border-white"></div>
-                      <span className="font-bold text-primary">Origin: {origin}</span>
-                      <span className="text-[10px] text-on-surface-muted font-bold">Start Point</span>
-                    </div>
-
-                    {/* Stops */}
-                    {routePoints.map((pt, idx) => (
-                      <div 
-                        key={idx}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, idx)}
-                        onDragOver={(e) => handleDragOver(e, idx)}
-                        onDragEnd={handleDragEnd}
-                        className={`relative flex items-center justify-between bg-white px-3 py-2 rounded border shadow-sm hover:border-secondary/30 transition-all cursor-grab active:cursor-grabbing ${
-                          draggedIndex === idx 
-                            ? 'opacity-40 border-secondary bg-surface-low shadow-inner' 
-                            : 'border-outline-light'
-                        }`}
-                      >
-                        <div className="absolute -left-[33px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-primary rounded-full border-4 border-white z-10"></div>
-                        <div className="flex items-center gap-3">
-                          <span className="material-symbols-outlined text-on-surface-muted/30 text-[18px] select-none">
-                            drag_indicator
-                          </span>
-                          <div>
-                            <span className="px-1.5 py-0.5 bg-primary/10 text-primary font-bold text-[8px] rounded uppercase tracking-wider mr-2">
-                              {pt.type}
-                            </span>
-                            <span className="font-bold text-primary">{pt.name}, {pt.state}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            disabled={idx === 0}
-                            onClick={() => handleMoveUp(idx)}
-                            className="p-1 hover:bg-surface-low rounded text-on-surface-muted disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">arrow_upward</span>
-                          </button>
-                          <button
-                            type="button"
-                            disabled={idx === routePoints.length - 1}
-                            onClick={() => handleMoveDown(idx)}
-                            className="p-1 hover:bg-surface-low rounded text-on-surface-muted disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">arrow_downward</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePoint(idx)}
-                            className="p-1 hover:bg-red-50 hover:text-red-600 rounded text-on-surface-muted cursor-pointer"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">delete</span>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-
-                    {/* Destination */}
-                    <div className="relative flex items-center justify-between bg-white px-3 py-2 rounded border border-outline-light shadow-sm text-xs">
-                      <div className="absolute -left-[33px] top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-secondary rounded-full border-4 border-white"></div>
-                      <span className="font-bold text-secondary">Destination: {destination}</span>
-                      <span className="text-[10px] text-secondary font-bold font-mono">End Point</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Save Route Button */}
-                <div className="flex justify-end pt-2">
-                  <button
-                    type="button"
-                    onClick={handleUpdate}
-                    disabled={saving}
-                    className="h-10 px-6 bg-secondary text-white text-xs font-bold rounded hover:brightness-110 active:scale-95 transition-all flex items-center gap-2 shadow-md cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-sm">save</span>
-                    {saving ? 'Saving Route...' : 'Save Route Changes'}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="p-6 space-y-6">
-                <div className="relative pl-6 space-y-6 border-l-2 border-dashed border-outline-light">
-                  
-                  {/* Origin */}
-                  <div className="relative flex items-start gap-4">
-                    <div className="absolute -left-[33px] top-1 w-4 h-4 bg-primary rounded-full border-4 border-white shadow-sm"></div>
-                    <div>
-                      <span className="px-2 py-0.5 bg-primary/10 text-primary font-bold text-[9px] rounded uppercase tracking-wider">Origin</span>
-                      <h4 className="text-sm font-bold text-primary mt-1">{shipment.origin}</h4>
-                      <p className="text-xs text-on-surface-muted mt-0.5">SLA Dispatch Registered</p>
-                    </div>
-                  </div>
-
-                  {/* Intermediate Stops */}
-                  {shipment.routePoints && shipment.routePoints.map((pt, idx) => (
-                    <div key={idx} className="relative flex items-start gap-4">
-                      <div className="absolute -left-[33px] top-1 w-4 h-4 bg-primary rounded-full border-4 border-white shadow-sm"></div>
-                      <div>
-                        <span className="px-2 py-0.5 bg-primary/10 text-primary font-bold text-[9px] rounded uppercase tracking-wider">
-                          {pt.type}
-                        </span>
-                        <h4 className="text-sm font-bold text-primary mt-1">{pt.name}, {pt.state}</h4>
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Destination */}
-                  <div className="relative flex items-start gap-4">
-                    <div className="absolute -left-[33px] top-1 w-4 h-4 bg-secondary rounded-full border-4 border-white shadow-sm"></div>
-                    <div>
-                      <span className="px-2 py-0.5 bg-secondary/10 text-secondary font-bold text-[9px] rounded uppercase tracking-wider">Destination</span>
-                      <h4 className="text-sm font-bold text-primary mt-1">{shipment.destination}</h4>
-                      <p className="text-xs text-on-surface-muted mt-0.5">Final Delivery Location</p>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-            )}
-          </section>
+          <UpdateRouteStops
+            origin={origin}
+            setOrigin={setOrigin}
+            destination={destination}
+            setDestination={setDestination}
+            routePoints={routePoints}
+            setRoutePoints={setRoutePoints}
+            isEditingRoute={isEditingRoute}
+            setIsEditingRoute={setIsEditingRoute}
+            newPoint={newPoint}
+            setNewPoint={setNewPoint}
+            handleAddPoint={handleAddPoint}
+            handleRemovePoint={handleRemovePoint}
+            handleMoveUp={handleMoveUp}
+            handleMoveDown={handleMoveDown}
+            draggedIndex={draggedIndex}
+            handleDragStart={handleDragStart}
+            handleDragOver={handleDragOver}
+            handleDragEnd={handleDragEnd}
+            handleUpdate={handleUpdate}
+            saving={saving}
+            shipment={shipment}
+            LOCATION_PRESETS={LOCATION_PRESETS}
+          />
         </div>
 
-        {/* RIGHT COLUMN: Metadata (35%) */}
-        <div className="lg:col-span-4 space-y-8">
-          
-          {/* Customer Info */}
-          <section className="bg-white border border-outline-light rounded overflow-hidden shadow-sm">
-            <div className="p-6 border-b border-outline-light bg-surface-low flex items-center gap-3">
-              <span className="material-symbols-outlined text-secondary">person_outline</span>
-              <h2 className="text-xs font-bold text-secondary uppercase tracking-wider">Customer Details</h2>
-            </div>
-            <div className="p-6 space-y-4 text-sm">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded bg-secondary flex items-center justify-center font-extrabold text-white text-lg">
-                  {shipment.customerName ? shipment.customerName.charAt(0).toUpperCase() : 'C'}
-                </div>
-                <div>
-                  <p className="font-bold text-primary">{shipment.customerName || 'Mehar Premium Freight Client'}</p>
-                  <p className="text-xs text-on-surface-muted mt-0.5">Registered Customer</p>
-                </div>
-              </div>
-              <div className="space-y-3 pt-2 border-t border-outline-faint">
-                <div className="flex justify-between">
-                  <span className="text-on-surface-muted text-xs font-bold">Contact Phone</span>
-                  <span className="font-bold text-primary">{shipment.phone || '+91 99967 61999'}</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Driver details */}
-          {shipment.driver && (
-            <section className="bg-white border border-outline-light rounded overflow-hidden shadow-sm">
-              <div className="p-6 border-b border-outline-light bg-surface-low flex items-center gap-3">
-                <span className="material-symbols-outlined text-secondary">inventory_2</span>
-                <h2 className="text-xs font-bold text-secondary uppercase tracking-wider">Assigned Driver</h2>
-              </div>
-              <div className="p-6 space-y-6 text-sm">
-                <div className="flex items-center gap-4">
-                  <img
-                    alt="Driver avatar"
-                    className="w-12 h-12 rounded-full border border-secondary object-cover bg-surface-mid"
-                    src={shipment.driver.photoUrl}
-                  />
-                  <div>
-                    <p className="font-bold text-primary">{shipment.driver.name}</p>
-                    <p className="text-xs text-on-surface-muted mt-0.5">Highway Operator</p>
-                  </div>
-                </div>
-                <div className="space-y-3 pt-2 border-t border-outline-faint">
-                  <div className="flex justify-between">
-                    <span className="text-on-surface-muted text-xs font-bold">Vehicle Details</span>
-                    <span className="font-bold text-primary">{shipment.vehicle || 'Tata Prima 4028 (HR 55 AT 4421)'}</span>
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {/* Quick actions box */}
-          <div className="flex flex-col gap-2 p-4 bg-white rounded border-2 border-dashed border-outline-light">
-            <p className="text-[10px] text-center font-bold text-on-surface-muted uppercase py-1">Quick Utilities</p>
-            <button
-              onClick={() => window.print()}
-              className="h-10 px-4 text-xs font-bold text-secondary hover:bg-surface-low rounded transition-colors flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined text-sm">print</span>
-              Print Waybill Document
-            </button>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(`http://localhost:5173/track?id=${shipment.trackingId}`)
-                showModal('Link Copied', 'User tracking link copied to clipboard!', 'success')
-              }}
-              className="h-10 px-4 text-xs font-bold text-secondary hover:bg-surface-low rounded transition-colors flex items-center justify-center gap-2"
-            >
-              <span className="material-symbols-outlined text-sm">share</span>
-              Copy Tracking URL
-            </button>
-          </div>
+        <div className="lg:col-span-4 space-y-6">
+          <UpdateManifestDetails
+            isEditingDetails={isEditingDetails}
+            setIsEditingDetails={setIsEditingDetails}
+            customerName={customerName}
+            setCustomerName={setCustomerName}
+            customerPhone={customerPhone}
+            setCustomerPhone={setCustomerPhone}
+            driverName={driverName}
+            setDriverName={setDriverName}
+            driverPhone={driverPhone}
+            setDriverPhone={setDriverPhone}
+            driverWhatsapp={driverWhatsapp}
+            setDriverWhatsapp={setDriverWhatsapp}
+            vehicle={vehicle}
+            setVehicle={setVehicle}
+            weight={weight}
+            setWeight={setWeight}
+            packagesCount={packagesCount}
+            setPackagesCount={setPackagesCount}
+            shipmentType={shipmentType}
+            setShipmentType={setShipmentType}
+            cargoDescription={cargoDescription}
+            setCargoDescription={setCargoDescription}
+            specialInstructions={specialInstructions}
+            setSpecialInstructions={setSpecialInstructions}
+            handleUpdate={handleUpdate}
+            saving={saving}
+            shipment={shipment}
+            showModal={showModal}
+          />
         </div>
       </div>
-      {/* Custom Modal Dialog */}
+
       {modal.isOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-primary/45 backdrop-blur-sm animate-fade-in">
           <div className="bg-white border border-outline-light rounded-xl p-6 shadow-2xl max-w-sm w-full mx-4 space-y-4 scale-up-100 transition-all">

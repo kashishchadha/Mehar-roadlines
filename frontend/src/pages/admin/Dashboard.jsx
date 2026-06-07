@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { formatDateDDMMYYYY } from '../../utils/dateUtils'
+import apiClient from '../../utils/apiClient'
 
 const formatRelativeTime = (dateString) => {
   const date = new Date(dateString)
@@ -14,16 +17,25 @@ const formatRelativeTime = (dateString) => {
   if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
   if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
   
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  return `${day}/${month}/${year}`
 }
 
 function Dashboard() {
-  const [shipments, setShipments] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  
-  // Filters state
   const [copiedId, setCopiedId] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedLocation, setSelectedLocation] = useState('All Locations')
+  const [timeFilter, setTimeFilter] = useState('All Time')
+
+  const { data: shipments = [], isLoading: loading, error } = useQuery({
+    queryKey: ['shipments'],
+    queryFn: async () => {
+      const res = await apiClient.get('/shipments')
+      return res.data
+    }
+  })
 
   const handleCopy = (id) => {
     navigator.clipboard.writeText(id)
@@ -31,41 +43,22 @@ function Dashboard() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedLocation, setSelectedLocation] = useState('All Locations')
-  const [timeFilter, setTimeFilter] = useState('All Time')
-
-  useEffect(() => {
-    const fetchShipments = async () => {
-      try {
-        const res = await fetch('http://localhost:5000/api/shipments')
-        if (!res.ok) throw new Error('Failed to fetch shipments')
-        const data = await res.json()
-        setShipments(data)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchShipments()
-  }, [])
-
-  // Calculate statistics
   const totalShipments = shipments.length
   const inTransitCount = shipments.filter(s => s.status.toLowerCase() === 'in transit').length
   const deliveredCount = shipments.filter(s => s.status.toLowerCase() === 'delivered').length
   const pendingCount = shipments.filter(s => ['booked', 'dispatched', 'picked up'].includes(s.status.toLowerCase())).length
 
+
   // CSV Exporter for "Export Excel"
   const handleExportCSV = () => {
     if (filteredShipments.length === 0) return
-    const headers = ['Tracking ID', 'From', 'To', 'Status', 'Last Updated']
+    const headers = ['Tracking ID', 'From', 'To', 'Status', 'Delivery Date', 'Last Updated']
     const rows = filteredShipments.map(s => [
       s.trackingId,
       s.origin,
       s.destination,
       s.status.toUpperCase(),
+      formatDateDDMMYYYY(s.estimatedArrival),
       new Date(s.updatedAt).toLocaleString()
     ])
     
@@ -154,9 +147,10 @@ function Dashboard() {
       {error && (
         <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded flex items-center gap-3">
           <span className="material-symbols-outlined">error</span>
-          <span className="font-semibold">Error: {error}</span>
+          <span className="font-semibold">Error: {error.message || String(error)}</span>
         </div>
       )}
+
 
       {/* Stat Cards */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -240,7 +234,7 @@ function Dashboard() {
             }}
             className="text-sm text-secondary font-bold hover:underline flex items-center gap-1"
           >
-            View All Records
+             All Records
             <span className="material-symbols-outlined text-[18px]">arrow_right_alt</span>
           </button>
         </div>
@@ -326,6 +320,7 @@ function Dashboard() {
                   <th className="px-6 py-4 text-xs font-bold text-on-surface-muted uppercase tracking-wider">From</th>
                   <th className="px-6 py-4 text-xs font-bold text-on-surface-muted uppercase tracking-wider">To</th>
                   <th className="px-6 py-4 text-xs font-bold text-on-surface-muted uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-xs font-bold text-on-surface-muted uppercase tracking-wider">Delivery Date</th>
                   <th className="px-6 py-4 text-xs font-bold text-on-surface-muted uppercase tracking-wider">Last Updated</th>
                   <th className="px-6 py-4 text-xs font-bold text-on-surface-muted uppercase tracking-wider text-right">Action</th>
                 </tr>
@@ -335,7 +330,12 @@ function Dashboard() {
                   <tr key={shipment._id} className="hover:bg-surface-low transition-colors duration-150">
                     <td className="px-6 py-5 font-bold text-primary text-sm tracking-wider font-mono">
                       <div className="flex items-center gap-2 group/id">
-                        <span className="inline-block w-28 shrink-0">{shipment.trackingId}</span>
+                        <Link
+                          to={`/admin/shipment/${shipment.trackingId}`}
+                          className="inline-block w-28 shrink-0 hover:text-secondary hover:underline transition-colors"
+                        >
+                          {shipment.trackingId}
+                        </Link>
                         <button
                           onClick={() => handleCopy(shipment.trackingId)}
                           className="p-1 hover:bg-surface-mid rounded transition-all text-on-surface-muted/65 hover:text-secondary cursor-pointer"
@@ -350,6 +350,7 @@ function Dashboard() {
                     <td className="px-6 py-5 text-on-surface-muted text-sm font-medium">{shipment.origin}</td>
                     <td className="px-6 py-5 text-on-surface-muted text-sm font-medium">{shipment.destination}</td>
                     <td className="px-6 py-5">{getStatusBadge(shipment.status)}</td>
+                    <td className="px-6 py-5 text-on-surface-muted text-sm font-medium">{formatDateDDMMYYYY(shipment.estimatedArrival)}</td>
                     <td className="px-6 py-5 text-on-surface-muted text-sm font-medium">
                       {formatRelativeTime(shipment.updatedAt)}
                     </td>
