@@ -101,10 +101,10 @@ function Home({ onQuoteClick }) {
         <div className="max-w-[var(--spacing-container)] mx-auto px-5 md:px-[var(--spacing-edge)] text-center">
           <h2 className="text-3xl md:text-[40px] font-bold text-primary mb-6 leading-tight">Simple. Reliable. On Time.</h2>
           <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-16 relative">
-            <div className="hidden md:block absolute top-12 left-[33%] right-[33%] h-0.5 bg-surface-high" />
+            <div className="hidden md:block absolute top-12 left-[16.6%] right-[16.6%] h-[2px] bg-slate-200 z-0" />
             {steps.map((step) => (
               <div key={step.num} className="flex flex-col items-center group">
-                <div className="w-24 h-24 rounded-full bg-surface-low flex items-center justify-center mb-8 border-2 border-primary group-hover:border-secondary transition-colors duration-300 shadow-sm">
+                <div className="w-24 h-24 rounded-full bg-white flex items-center justify-center mb-8 border-2 border-primary group-hover:border-secondary transition-colors duration-300 shadow-sm relative z-10">
                   <span className="text-2xl font-bold text-primary group-hover:text-secondary transition-colors duration-300">{step.num}</span>
                 </div>
                 <h3 className="text-xl font-semibold text-primary mb-3">{step.title}</h3>

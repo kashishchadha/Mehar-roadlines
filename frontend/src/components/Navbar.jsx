@@ -10,7 +10,7 @@ function Navbar({ onQuoteClick }) {
   useEffect(() => {
     setMobileOpen(false)
     window.scrollTo(0, 0)
-    setIsAdmin(localStorage.getItem('adminToken') === 'true')
+    setIsAdmin(!!localStorage.getItem('adminToken'))
   }, [location.pathname])
 
   useEffect(() => {

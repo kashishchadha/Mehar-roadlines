@@ -5,30 +5,30 @@ export default function Step3Cargo({ formData, handleChange, handleBack }) {
     <div className="bg-white border border-outline-light p-8 rounded-xl shadow-sm space-y-6">
       <div className="flex items-center gap-3 border-b border-outline-light pb-4">
         <span className="material-symbols-outlined text-primary text-3xl">inventory_2</span>
-        <h3 className="text-xl font-bold text-primary">Load &amp; Driver Contact</h3>
+        <h3 className="text-xl font-bold text-primary">Load &amp; Contact Details</h3>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-bold text-on-surface-muted">Contact Person Name</label>
+          <label className="text-sm font-bold text-on-surface-muted">Load Contact Name</label>
           <input
             type="text"
-            name="contactName"
-            value={formData.contactName}
+            name="driverName"
+            value={formData.driverName || ''}
             onChange={handleChange}
-            placeholder="Receiver/Agent name"
+            placeholder="e.g. Ravi"
             className="h-12 px-4 bg-white border border-outline-light rounded focus:ring-1 focus:ring-secondary focus:border-secondary text-sm outline-none"
           />
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-bold text-on-surface-muted">Contact Phone</label>
+          <label className="text-sm font-bold text-on-surface-muted">Load Contact Phone</label>
           <input
             type="tel"
-            name="contactPhone"
-            value={formData.contactPhone}
+            name="driverPhone"
+            value={formData.driverPhone || ''}
             onChange={handleChange}
-            placeholder="+91 99999 99999"
+            placeholder="e.g. 9996761999"
             className="h-12 px-4 bg-white border border-outline-light rounded focus:ring-1 focus:ring-secondary focus:border-secondary text-sm outline-none"
           />
         </div>
@@ -38,7 +38,7 @@ export default function Step3Cargo({ formData, handleChange, handleBack }) {
           <input
             type="text"
             name="cargoDescription"
-            value={formData.cargoDescription}
+            value={formData.cargoDescription || ''}
             onChange={handleChange}
             placeholder="e.g. Steel Sheets, Industrial Gears"
             className="h-12 px-4 bg-white border border-outline-light rounded focus:ring-1 focus:ring-secondary focus:border-secondary text-sm outline-none"
@@ -51,7 +51,7 @@ export default function Step3Cargo({ formData, handleChange, handleBack }) {
             <input
               type="number"
               name="weight"
-              value={formData.weight}
+              value={formData.weight || ''}
               onChange={handleChange}
               placeholder="0.00"
               className="w-full h-12 px-4 pr-12 bg-white border border-outline-light rounded focus:ring-1 focus:ring-secondary focus:border-secondary text-sm outline-none"
@@ -65,7 +65,7 @@ export default function Step3Cargo({ formData, handleChange, handleBack }) {
           <input
             type="number"
             name="packagesCount"
-            value={formData.packagesCount}
+            value={formData.packagesCount || ''}
             onChange={handleChange}
             placeholder="Count"
             className="h-12 px-4 bg-white border border-outline-light rounded focus:ring-1 focus:ring-secondary focus:border-secondary text-sm outline-none"
@@ -77,21 +77,9 @@ export default function Step3Cargo({ formData, handleChange, handleBack }) {
           <input
             type="text"
             name="specialInstructions"
-            value={formData.specialInstructions}
+            value={formData.specialInstructions || ''}
             onChange={handleChange}
             placeholder="Fragile handling, etc."
-            className="h-12 px-4 bg-white border border-outline-light rounded focus:ring-1 focus:ring-secondary focus:border-secondary text-sm outline-none"
-          />
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-bold text-on-surface-muted">Assigned Driver Name</label>
-          <input
-            type="text"
-            name="driverName"
-            value={formData.driverName || ''}
-            onChange={handleChange}
-            placeholder="e.g. Sarabjit Singh"
             className="h-12 px-4 bg-white border border-outline-light rounded focus:ring-1 focus:ring-secondary focus:border-secondary text-sm outline-none"
           />
         </div>

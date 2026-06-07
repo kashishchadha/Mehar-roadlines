@@ -140,10 +140,12 @@ function Contact() {
               </ul>
             </div>
             <div className="h-64 w-full bg-surface-high rounded overflow-hidden border border-outline-light relative">
-              <img
-                className="w-full h-full object-cover grayscale brightness-90"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDOAKzI2Y_mYFhJxfqIlzFYrp_jVQ4RWMqVWax_81KwAstLtgDtFF4rSr18mFg6-BIcelaG8814fJ2-B-suPYYo2DebuKKyIdEAmB2ySZZQ5LtbQm-6T9GJYZp7dcfQCJ-Sl4AFUI9QVmp27Sa6FLAVtegrwWCrJJA_3SWWNt6lbAxb60fJQJRxak0ciqKMVZEHMM6RcmfJK_mn4Qy2KVww8Va051t-S6qgPQDrT5Hkx10xaB6CfbM64wMYFSieYbm9VV6N_HrwJWYs"
-                alt="Location map of Mehar Roadlines headquarters in Ludhiana"
+              <iframe
+                title="Mehar Roadlines Ludhiana Office Map"
+                className="w-full h-full border-none grayscale brightness-95"
+                src="https://maps.google.com/maps?q=12/B,+Transport+Nagar,+Phase+III,+Ludhiana,+Punjab+141003&t=m&z=16&iwloc=A&output=embed"
+                allowFullScreen
+                loading="lazy"
               />
               <div className="absolute inset-0 border-4 border-primary/10 pointer-events-none" />
             </div>

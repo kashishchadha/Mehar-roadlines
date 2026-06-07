@@ -1,5 +1,9 @@
 const Shipment = require('../models/Shipment');
 
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 exports.getAllShipments = async (req, res) => {
   try {
     const shipments = await Shipment.find().sort({ createdAt: -1 });
@@ -13,7 +17,7 @@ exports.checkIdAvailability = async (req, res) => {
   try {
     const { trackingId } = req.params;
     const shipment = await Shipment.findOne({
-      trackingId: { $regex: new RegExp(`^${trackingId.trim()}$`, 'i') }
+      trackingId: { $regex: new RegExp(`^${escapeRegex(trackingId.trim())}$`, 'i') }
     });
     res.json({ available: !shipment });
   } catch (error) {
@@ -25,7 +29,7 @@ exports.getShipmentById = async (req, res) => {
   try {
     const { trackingId } = req.params;
     const shipment = await Shipment.findOne({
-      trackingId: { $regex: new RegExp(`^${trackingId.trim()}$`, 'i') }
+      trackingId: { $regex: new RegExp(`^${escapeRegex(trackingId.trim())}$`, 'i') }
     });
 
     if (!shipment) {
@@ -58,23 +62,49 @@ exports.createShipment = async (req, res) => {
       packagesCount,
       specialInstructions,
       routePoints,
-      driverName
+      driverName,
+      driverPhone,
+      driverWhatsapp
     } = req.body;
 
     if (!customerName || !phone || !originCity || !destinationCity) {
       return res.status(400).json({ message: 'Customer Name, Phone, Origin, and Destination are required.' });
     }
 
+    // Date validations
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (shipmentDate) {
+      const shipDate = new Date(shipmentDate);
+      if (shipDate < today) {
+        return res.status(400).json({ message: 'Shipment date cannot be before current date.' });
+      }
+    }
+
+    if (expectedDeliveryDate) {
+      const deliveryDate = new Date(expectedDeliveryDate);
+      if (deliveryDate < today) {
+        return res.status(400).json({ message: 'Expected delivery date cannot be before current date.' });
+      }
+      if (shipmentDate && deliveryDate < new Date(shipmentDate)) {
+        return res.status(400).json({ message: 'Expected delivery date cannot be before shipment date.' });
+      }
+    }
+
     let trackingId = customTrackingId ? customTrackingId.trim() : '';
     if (trackingId) {
       const existing = await Shipment.findOne({
-        trackingId: { $regex: new RegExp(`^${trackingId}$`, 'i') }
+        trackingId: { $regex: new RegExp(`^${escapeRegex(trackingId)}$`, 'i') }
       });
       if (existing) {
         return res.status(400).json({ message: 'Tracking ID is already in use.' });
       }
     } else {
-      trackingId = `MR-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      const firstL = letters[Math.floor(Math.random() * 26)];
+      const secondL = letters[Math.floor(Math.random() * 26)];
+      trackingId = `${firstL}${secondL}-${Math.floor(10000 + Math.random() * 90000)}`;
     }
 
     const getFormattedDate = () => {
@@ -93,10 +123,10 @@ exports.createShipment = async (req, res) => {
     ];
 
     const driver = {
-      name: driverName ? driverName.trim() : 'Sarabjit Singh',
+      name: driverName ? driverName.trim() : 'Ravi',
       photoUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAwsl3zo4ZQrhUQ-4y0ut7mGYIB73kG7EWLiKcaWjkzAiRgEuWBgz3fvQbCd6yhsSYPn2jjVFd7Iy14ifn6mhfjAOqejTw6U7nqs6WMJjWek8F9JWfeyZ6iIN31YIulfDgM8unp7MFYxTKm0L9Y5gHlvqCoXYvW4EAqnCv783DhzHz99DxEVIA0Jt67vo6y8J4jpGRgEXBTW-IozCAO3j8LJX0CGAjC_J2ecvQCEi1oNsu38_L46hohgtKHEy4IUeeTlrAG0tU08xBb',
-      phone: '+91 98765 43210',
-      whatsapp: '919876543210'
+      phone: driverPhone ? driverPhone.trim() : '9996761999',
+      whatsapp: driverWhatsapp ? driverWhatsapp.trim() : '9996761999'
     };
 
     const vehicleNo = `HR 55 ${['AT','BT','CK','DL'][Math.floor(Math.random()*4)]} ${Math.floor(1000 + Math.random()*9000)}`;
@@ -168,11 +198,32 @@ exports.updateShipment = async (req, res) => {
     } = req.body;
 
     const shipment = await Shipment.findOne({
-      trackingId: { $regex: new RegExp(`^${trackingId.trim()}$`, 'i') }
+      trackingId: { $regex: new RegExp(`^${escapeRegex(trackingId.trim())}$`, 'i') }
     });
 
     if (!shipment) {
       return res.status(404).json({ message: 'Shipment not found.' });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (shipmentDate) {
+      const shipDate = new Date(shipmentDate);
+      if (shipDate < today) {
+        return res.status(400).json({ message: 'Shipment date cannot be before current date.' });
+      }
+    }
+
+    if (expectedDeliveryDate) {
+      const deliveryDate = new Date(expectedDeliveryDate);
+      if (deliveryDate < today) {
+        return res.status(400).json({ message: 'Expected delivery date cannot be before current date.' });
+      }
+      const activeShipmentDate = shipmentDate || shipment.shipmentDate;
+      if (activeShipmentDate && deliveryDate < new Date(activeShipmentDate)) {
+        return res.status(400).json({ message: 'Expected delivery date cannot be before shipment date.' });
+      }
     }
 
     if (status) shipment.status = status;

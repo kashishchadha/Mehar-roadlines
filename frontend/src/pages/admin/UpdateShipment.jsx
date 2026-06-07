@@ -216,6 +216,18 @@ function UpdateShipment() {
 
   const handleUpdate = async (e) => {
     if (e) e.preventDefault()
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (deliveryDate) {
+      const delivDate = new Date(deliveryDate);
+      if (delivDate < today) {
+        showModal('Invalid Date', 'Expected delivery date cannot be in the past.', 'error');
+        return;
+      }
+    }
+
     setSaving(true)
     
     let finalRoutePoints = [...routePoints]

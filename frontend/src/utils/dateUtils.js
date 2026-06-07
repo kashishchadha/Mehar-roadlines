@@ -60,7 +60,7 @@ export function parseEstimatedArrival(estimatedArrival) {
     if (match[2]) {
       timeOfDay = match[2];
     }
-    
+
     const ddmm = rawDate.match(/^(\d{2})[\s\/]+(\d{2})[\s\/]+(\d{4})$/);
     if (ddmm) {
       datePart = `${ddmm[3]}-${ddmm[2]}-${ddmm[1]}`;

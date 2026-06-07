@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import apiClient from '../../utils/apiClient'
 
 import Step1Details from '../../components/admin/CreateShipmentStep1'
@@ -13,8 +13,15 @@ function CreateShipment() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  const generateTrackingId = () => {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const firstL = letters[Math.floor(Math.random() * 26)];
+    const secondL = letters[Math.floor(Math.random() * 26)];
+    return `${firstL}${secondL}-${Math.floor(10000 + Math.random() * 90000)}`;
+  };
+
   const [formData, setFormData] = useState({
-    trackingId: `MR-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`,
+    trackingId: generateTrackingId(),
     shipmentType: 'Full Truck Load (FTL)',
     customerName: '',
     phone: '',
@@ -30,10 +37,9 @@ function CreateShipment() {
     weight: '',
     packagesCount: '',
     specialInstructions: '',
-    contactName: '',
-    contactPhone: '',
-    contactEmail: '',
-    department: 'Operations',
+    driverName: 'Ravi',
+    driverPhone: '9996761999',
+    driverWhatsapp: '9996761999',
     routePoints: []
   })
 
@@ -46,7 +52,7 @@ function CreateShipment() {
   useState(() => {
     const checkInitial = async () => {
       try {
-        const initialId = `MR-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+        const initialId = generateTrackingId();
         const res = await apiClient.get(`/shipments/check-id/${initialId}`);
         if (res.data.available) {
           setFormData(prev => ({ ...prev, trackingId: initialId }));
@@ -81,7 +87,7 @@ function CreateShipment() {
   }
 
   const handleRegenerateId = () => {
-    const newId = `MR-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
+    const newId = generateTrackingId();
     setFormData(prev => ({ ...prev, trackingId: newId }));
     checkIdAvailability(newId);
   }
@@ -199,6 +205,28 @@ function CreateShipment() {
       if (!formData.customerName || !formData.phone || !formData.originCity) {
         setError('Please fill in Customer Name, Contact, and Origin City.')
         return
+      }
+      if (formData.shipmentDate) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const shipDate = new Date(formData.shipmentDate);
+        if (shipDate < today) {
+          setError('Shipment date cannot be in the past.');
+          return;
+        }
+      }
+      if (formData.expectedDeliveryDate) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const delivDate = new Date(formData.expectedDeliveryDate);
+        if (delivDate < today) {
+          setError('Expected delivery date cannot be in the past.');
+          return;
+        }
+        if (formData.shipmentDate && delivDate < new Date(formData.shipmentDate)) {
+          setError('Expected delivery date cannot be before shipment date.');
+          return;
+        }
       }
       if (!idValidation.available) {
         setError(idValidation.error || 'The selected Tracking ID is already in use. Please enter a different ID.')
@@ -379,20 +407,5 @@ function CreateShipment() {
   )
 }
 
-function Link({ to, children, className }) {
-  return (
-    <a
-      href={to}
-      onClick={(e) => {
-        e.preventDefault()
-        window.history.pushState({}, '', to)
-        window.dispatchEvent(new PopStateEvent('popstate'))
-      }}
-      className={className}
-    >
-      {children}
-    </a>
-  )
-}
 
 export default CreateShipment

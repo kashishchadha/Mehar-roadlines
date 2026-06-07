@@ -157,7 +157,7 @@ function TrackShipment() {
                     </div>
                     <h4 className="font-bold text-primary text-sm">Get Live Status</h4>
                     <p className="text-xs text-on-surface-muted leading-relaxed">
-                      View transit history, active driver contact, and estimated arrival timelines.
+                      View transit history, active load contact, and estimated arrival timelines.
                     </p>
                   </div>
                 </div>
@@ -344,8 +344,8 @@ function TrackShipment() {
                   </div>
                 </section>
 
-                {/* Detailed Route Timeline if available */}
-                {shipment.routePoints && shipment.routePoints.length > 0 && (
+                {/* Detailed Route Timeline */}
+                {shipment.origin && (
                   <section className="bg-white border border-outline-light p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
                     <h3 className="text-xs font-bold text-secondary uppercase tracking-wider mb-6 flex items-center gap-2">
                       <span className="material-symbols-outlined text-[18px]">alt_route</span>
@@ -462,75 +462,74 @@ function TrackShipment() {
               {/* Right Column (col-span-4): Shipment details & Driver info */}
               <div className="lg:col-span-4 space-y-6">
                 
-                {/* Details Card */}
-                <div className="bg-white border border-outline-light p-6 md:p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow space-y-6">
-                  <h3 className="text-lg font-bold text-primary border-b border-outline-faint pb-3 flex items-center gap-2">
-                    <span className="material-symbols-outlined text-secondary">description</span>
-                    Shipment Details
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    {shipmentDetails.map((detail) => (
-                      <div key={detail.label} className="border-b border-outline-faint/40 pb-3 last:border-b-0 last:pb-0">
-                        <p className="text-on-surface-muted text-xs font-bold uppercase tracking-wider mb-1.5">{detail.label}</p>
-                        {detail.route ? (
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-base font-extrabold text-primary">{detail.route.from}</span>
-                            <span className="material-symbols-outlined text-secondary text-sm">trending_flat</span>
-                            <span className="text-base font-extrabold text-primary">{detail.route.to}</span>
-                          </div>
-                        ) : (
-                          <p className={`text-base ${detail.highlight ? 'font-black text-secondary' : detail.bold ? 'font-bold text-primary' : 'text-primary font-semibold'}`}>
-                            {detail.value}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                 {/* Details Card */}
+                 <div className="bg-white border border-outline-light p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow space-y-4">
+                   <h3 className="text-sm font-bold text-primary border-b border-outline-faint pb-3 flex items-center gap-2 uppercase tracking-wider">
+                     <span className="material-symbols-outlined text-secondary text-lg">description</span>
+                     Shipment Details
+                   </h3>
+                   
+                   <div className="space-y-1">
+                     {shipmentDetails.map((detail) => (
+                       <div key={detail.label} className="flex justify-between items-center py-2.5 border-b border-outline-faint/30 last:border-b-0 last:pb-0">
+                         <span className="text-on-surface-muted text-xs font-bold uppercase tracking-wider">{detail.label}</span>
+                         {detail.route ? (
+                           <div className="flex items-center gap-1.5 text-sm font-bold text-primary">
+                             <span>{detail.route.from}</span>
+                             <span className="material-symbols-outlined text-secondary text-[16px]">arrow_forward</span>
+                             <span>{detail.route.to}</span>
+                           </div>
+                         ) : (
+                           <span className={`text-sm ${detail.highlight ? 'font-extrabold text-secondary' : detail.bold ? 'font-bold text-primary' : 'text-primary font-semibold'}`}>
+                             {detail.value}
+                           </span>
+                         )}
+                       </div>
+                     ))}
+                   </div>
+                 </div>
 
-                {/* Driver Support Card */}
+                {/* Load Contact Support Card */}
                 {shipment.driver && (
-                  <div className="bg-white border border-outline-light p-6 md:p-8 rounded-2xl shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between space-y-6">
-                    <div>
-                      <h3 className="text-lg font-bold text-primary border-b border-outline-faint pb-3 flex items-center gap-2 mb-6">
-                        <span className="material-symbols-outlined text-secondary">local_shipping</span>
-                        Transit Crew
-                      </h3>
-                      
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-full overflow-hidden bg-surface-mid border-2 border-outline-light shrink-0">
-                          <img
-                            alt={`Driver ${shipment.driver.name}`}
-                            className="w-full h-full object-cover"
-                            src={shipment.driver.photoUrl}
-                          />
-                        </div>
-                        <div>
-                          <p className="text-on-surface-muted text-xs font-bold uppercase tracking-wider">Assigned Driver</p>
-                          <p className="text-lg font-bold text-primary mt-0.5">{shipment.driver.name}</p>
-                          <p className="text-xs text-on-surface-muted">Licensed Heavy Cargo Handler</p>
-                        </div>
+                  <div className="bg-white border border-outline-light p-5 rounded-2xl shadow-sm hover:shadow-md transition-shadow space-y-4">
+                    <div className="flex items-center justify-between border-b border-outline-faint pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-secondary text-xl">assignment_ind</span>
+                        <h3 className="text-sm font-bold text-primary uppercase tracking-wider">Load Contact</h3>
                       </div>
                     </div>
                     
-                    <div className="space-y-3 pt-4 border-t border-outline-faint">
-                      <p className="text-on-surface-muted text-xs italic text-center">Need operational assistance for this shipment?</p>
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full overflow-hidden bg-surface-mid border border-outline-light shrink-0">
+                        <img
+                          alt={`Representative ${shipment.driver.name}`}
+                          className="w-full h-full object-cover"
+                          src={shipment.driver.photoUrl}
+                        />
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-bold text-on-surface-muted uppercase tracking-wider">Operations Executive</p>
+                        <h4 className="text-base font-bold text-primary mt-0.5">{shipment.driver.name}</h4>
+                        <p className="text-xs font-semibold text-secondary mt-0.5">{shipment.driver.phone}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2 pt-2 border-t border-outline-faint">
                       <a
                         href={`tel:${shipment.driver.phone}`}
-                        className="flex items-center justify-center gap-2 w-full bg-primary text-on-primary font-bold py-3.5 rounded-xl hover:bg-primary-light transition-all shadow-sm cursor-pointer"
+                        className="flex-1 flex items-center justify-center gap-1.5 bg-primary text-on-primary text-xs font-bold py-2.5 rounded-lg hover:bg-primary-light transition-all shadow-sm cursor-pointer"
                       >
-                        <span className="material-symbols-outlined text-lg">call</span>
-                        Call Driver Support
+                        <span className="material-symbols-outlined text-sm">call</span>
+                        Call
                       </a>
                       <a
                         href={`https://wa.me/${shipment.driver.whatsapp}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2 w-full bg-whatsapp text-white font-bold py-3.5 rounded-xl hover:brightness-110 transition-all shadow-sm cursor-pointer"
+                        className="flex-1 flex items-center justify-center gap-1.5 bg-whatsapp text-white text-xs font-bold py-2.5 rounded-lg hover:brightness-110 transition-all shadow-sm cursor-pointer"
                       >
-                        <span className="material-symbols-outlined text-lg">chat</span>
-                        WhatsApp Dispatch Desk
+                        <span className="material-symbols-outlined text-sm">chat</span>
+                        WhatsApp
                       </a>
                     </div>
                   </div>

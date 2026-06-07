@@ -111,13 +111,13 @@ export default function UpdateManifestDetails({
       <section className="bg-white border border-outline-light rounded-lg overflow-hidden shadow-sm">
         <div className="p-5 border-b border-outline-light bg-surface-low flex items-center gap-3">
           <span className="material-symbols-outlined text-secondary">assignment_ind</span>
-          <h2 className="text-xs font-bold text-secondary uppercase tracking-wider">Assigned Driver</h2>
+          <h2 className="text-xs font-bold text-secondary uppercase tracking-wider">Load Contact</h2>
         </div>
         <div className="p-5 space-y-4 text-sm">
           {isEditingDetails ? (
             <div className="space-y-3">
               <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold text-on-surface-muted uppercase">Driver Name</label>
+                <label className="text-[11px] font-bold text-on-surface-muted uppercase">Contact Name</label>
                 <input
                   type="text"
                   value={driverName}
@@ -126,7 +126,7 @@ export default function UpdateManifestDetails({
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold text-on-surface-muted uppercase">Driver Phone</label>
+                <label className="text-[11px] font-bold text-on-surface-muted uppercase">Contact Phone</label>
                 <input
                   type="text"
                   value={driverPhone}
@@ -157,18 +157,18 @@ export default function UpdateManifestDetails({
             <>
               <div className="flex items-center gap-4">
                 <img
-                  alt="Driver avatar"
+                  alt="Load Contact avatar"
                   className="w-12 h-12 rounded-full border border-secondary object-cover bg-surface-mid"
                   src={shipment.driver?.photoUrl || 'https://lh3.googleusercontent.com/aida-public/AB6AXuAwsl3zo4ZQrhUQ-4y0ut7mGYIB73kG7EWLiKcaWjkzAiRgEuWBgz3fvQbCd6yhsSYPn2jjVFd7Iy14ifn6mhfjAOqejTw6U7nqs6WMJjWek8F9JWfeyZ6iIN31YIulfDgM8unp7MFYxTKm0L9Y5gHlvqCoXYvW4EAqnCv783DhzHz99DxEVIA0Jt67vo6y8J4jpGRgEXBTW-IozCAO3j8LJX0CGAjC_J2ecvQCEi1oNsu38_L46hohgtKHEy4IUeeTlrAG0tU08xBb'}
                 />
                 <div>
-                  <p className="font-bold text-primary">{shipment.driver?.name || 'Unassigned Driver'}</p>
-                  <p className="text-xs text-on-surface-muted mt-0.5">Highway Operator</p>
+                  <p className="font-bold text-primary">{shipment.driver?.name || 'Unassigned'}</p>
+                  <p className="text-xs text-on-surface-muted mt-0.5">Load Contact Representative</p>
                 </div>
               </div>
               <div className="space-y-3 pt-2 border-t border-outline-faint">
                 <div className="flex justify-between">
-                  <span className="text-on-surface-muted text-xs font-bold">Driver Phone</span>
+                  <span className="text-on-surface-muted text-xs font-bold">Contact Phone</span>
                   <span className="font-bold text-primary">{shipment.driver?.phone || 'Not Specified'}</span>
                 </div>
                 <div className="flex justify-between">

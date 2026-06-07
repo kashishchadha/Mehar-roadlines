@@ -12,12 +12,12 @@ export default function Step1Details({ formData, handleChange, idValidation, han
         <div className="flex flex-col gap-2">
           <label className="text-sm font-bold text-on-surface-muted flex justify-between items-center">
             <span>Tracking ID (Auto or Custom)</span>
-            {idValidation.checking && (
+            {/* {idValidation.checking && (
               <span className="text-xs text-secondary flex items-center gap-1 font-medium animate-pulse">
                 <span className="material-symbols-outlined animate-spin text-[14px]">refresh</span>
                 Validating...
               </span>
-            )}
+            )} */}
           </label>
           <div className="flex gap-2">
             <input
